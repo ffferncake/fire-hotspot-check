@@ -1,0 +1,348 @@
+var MAP = {};
+
+MAP.initPage = function(){
+  Sys.HideLoading();
+  displayMap();
+  $("#btn-zoomto").on("click",MAP.zoomToData);
+  $("#division_c").on("change",function(){
+    var division_c = $("#division_c option:selected").val();
+    $.ajax({
+      url:"server/query.jsp"
+      ,type:"POST"
+      ,data:{
+        index:"get-district-by-division"
+        ,division_c: division_c
+      }
+      ,complete: function(xhr){
+        try{
+          Sys.HideLoading();
+          var jo = $.parseJSON(xhr.responseText);
+          if(jo && jo.exception) throw jo.exception;
+          var opt = "";
+          for(var i=0;i<jo.data.length;i++){
+            opt += "<option value=\""+jo.data[i].district_c+"\" x=\""+jo.data[i].x+"\" y=\""+jo.data[i].y+"\" >"+jo.data[i].district_n+"</option>";
+          }
+          $("#district_c").html(opt);
+        }catch(e){
+          app.dialog.alert(e);
+        }
+      }
+    });
+  });
+  $("#division_c").trigger("change");
+}
+
+var map;
+var Fg;
+var BING_KEY = 'AuhiCJHlGzhg93IqUH_oCpl_-ZUrIE6SPftlyGYUvr9Amx5nzA-WqGcPquyFZl4L';
+function resizeMap(){
+  if(map){
+    var tbH = $(".toolbar").outerHeight();
+    var nbH = $(".navbar").outerHeight();
+    var pgH = $(document.body).height();
+    //$(".tabs").css("padding-top",nbH);
+    $("#map").css("padding-top",nbH);
+    $("#map").height(pgH-(tbH));
+    map.invalidateSize();
+  }
+}
+function displayMap(){
+  window.onresize = resizeMap;
+  var tbH = $(".toolbar").outerHeight();
+  var nbH = $(".navbar").outerHeight();
+  var pgH = $(document.body).height();
+  //$(".tabs").css("padding-top",nbH);
+  $("#map").css("padding-top",nbH);
+  $("#map").height(pgH-(tbH));
+  
+
+  var BING_KEY = 'AuhiCJHlGzhg93IqUH_oCpl_-ZUrIE6SPftlyGYUvr9Amx5nzA-WqGcPquyFZl4L';
+  var bingLayer = L.tileLayer.bing(BING_KEY);
+
+  map = L.map('map').setView([14.9756, 102.0747], 13);
+  var googleLayer = L.tileLayer('http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',{
+      maxZoom: 21,
+      subdomains:['mt0','mt1','mt2','mt3']
+  });
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+	});
+  osm.addTo(map);
+  var bLayers = {
+    "แผนที่เส้นทาง": osm
+    ,"แผนที่จากดาวเทียม": bingLayer
+  }
+
+  
+
+  map.aadtLayer = L.tileLayer.wms("/geoserver/wms?", {
+    layers: 'doh_network',format:"image/png",transparent:true,tileSize: 512
+  });
+  map.aadtLayer.addTo(map);
+
+  map.dohFactory = L.tileLayer.wms("/geoserver/wms?", {
+    layers: 'vw_factory',format:"image/png",transparent:true,tileSize: 512
+  });
+  map.dohFactory.addTo(map);
+
+  map.dohStation = L.tileLayer.wms("/geoserver/wms?", {
+    layers: 'weight_stations',format:"image/png",transparent:true,tileSize: 512
+  });
+  map.dohStation.addTo(map);
+
+  map.dohDivision = L.tileLayer.wms("/geoserver/wms?", {
+    layers: 'doh_division',format:"image/png",transparent:true,tileSize: 512
+  });
+  map.dohDivision.addTo(map);
+  map.dohDistrict = L.tileLayer.wms("/geoserver/wms?", {
+    layers: 'doh_district',format:"image/png",transparent:true,tileSize: 512
+  });
+  map.dohDistrict.addTo(map);
+  map.dohDepot = L.tileLayer.wms("/geoserver/wms?", {
+    layers: 'doh_depot',format:"image/png",transparent:true,tileSize: 512
+  });
+  map.dohDepot.addTo(map);
+
+  
+
+  
+
+  map.LayerControl = L.control.layers(bLayers,{
+    "ปริมาณการจราจร": map.aadtLayer
+    ,"โรงงาน": map.dohFactory
+    ,"ด่านชั่งน้ำหนัก": map.dohStation
+    ,"สำนักงานทางหลวง": map.dohDivision
+    ,"สำนักงานแขวงทางหลวง": map.dohDistrict
+    ,"สำนักงานหมวดทางหลวง": map.dohDepot
+    
+    
+  },{position:"topright"});
+  map.LayerControl.addTo(map);
+
+  map.GeoControl = L.control.locate();
+  map.GeoControl.addTo(map);
+  //map.GeoControl.setPosition("verticalcenterleft");
+  //map.LayerControl.setPosition("verticalcenterright");
+  map.invalidateSize();
+  _setReportMarker();
+
+
+  map.on("click",function(e){
+    var ll = e.latlng
+    var utm_res = (156543.0339 * Math.cos(map.getCenter().lat * Math.PI / 180)) / Math.pow(2,map.getZoom());
+    var geo_res = (0.711 * Math.cos(map.getCenter().lat * Math.PI / 180)) / Math.pow(2,map.getZoom());
+    Sys.Loading();
+    $.ajax({
+      url:"server/query.jsp"
+      ,type:"POST"
+      ,data:{
+        index:"identify"
+        ,utm_res: utm_res
+        ,geo_res: geo_res 
+        ,x: ll.lng 
+        ,y: ll.lat
+      }
+      ,complete: function(xhr){
+        try{
+          Sys.HideLoading();
+          var jo = $.parseJSON(xhr.responseText);
+          if(jo && jo.exception){
+            app.dialog.alert(jo.exception);
+            return false;
+          }
+          var html = "";
+          if(jo.data && jo.name=="division"){
+            html = ""+jo.data.division_n;
+          }else if(jo.data && jo.name=="district"){
+            html = jo.data.district_n+"<br/>"+jo.data.division_n;
+          }else if(jo.data && jo.name=="depot"){
+            html = jo.data.depot_name+"<br/>"+jo.data.district_n+"<br/>"+jo.data.division_n;
+          }else if(jo.data && jo.name=="factory"){
+            html = "ข้อมูล <span style='color:red;'>โรงงาน</span>"+
+            "<br/>"+jo.data.fac_code+
+            "<br/>"+jo.data.fac_name_t+
+            "<br/>"+jo.data.fac_object+
+            "<br/>"+((jo.data.fac_hp)?parseInt(jo.data.fac_hp).toFixed(0):"-")+" แรงม้า";
+          }else if(jo.data && jo.name=="road_stat"){
+            html = "ข้อมูล <span style='color:red;'>สถิติ</span>"+
+            "<br/>"+jo.data.road_num+
+            "-"+jo.data.control_num+
+            "<br/>"+jo.data.section+
+            "<br/>ระยะทาง <span style='color:blue;'>"+parseFloat(jo.data.dist).toFixed(1)+"</span> กม."+
+            "<br/>รถบรรทุก 6 ล้อ <span style='color:blue;'>"+jo.data.truck6+"</span> คัน/วัน"+
+            "<br/>รถบรรทุก 10 ล้อ <span style='color:blue;'>"+jo.data.truck10+"</span> คัน/วัน"+
+            "<br/>รถบรรทุกพ่วงมากกว่า 3 เพลา <span style='color:blue;'>"+jo.data.tail3+"</span> คัน/วัน"+
+            "<br/>รถบรรทุกกึ่งพ่วงมากกว่า 3 เพลา <span style='color:blue;'>"+jo.data.tail3semi+"</span> คัน/วัน"+
+            "<br/>รถบรรทุกดัดแปลง <span style='color:blue;'>"+jo.data.other+"</span> คัน/วัน"+
+            "<br/>รวมรถบรรทุกหนัก <span style='color:red;'>"+jo.data.volumes+"</span> คัน/วัน";
+          }
+          if(html=="") return false;
+          L.popup()
+          .setLatLng(ll)
+          .setContent(html)
+          .openOn(map);
+
+        }catch(e){
+          alert(e);
+        }
+      }
+    });
+  });
+  
+}
+
+function _setReportMarker(ym){
+  var params = {index:"get-field-points"};
+  if(ym){
+    var ar = ym.split(",");
+    params.year = ar[0];
+    params.month = ar[1];
+    $("#title").html(ar[0]+"-"+ar[1]);
+  }
+  $.ajax({
+    url:"server/query.jsp"
+    ,type:"POST"
+    ,data: params
+    ,complete:function(xhr){
+      try{
+        var jo = $.parseJSON(xhr.responseText);
+        if(jo && jo.exception) throw jo.exception;
+        var data = jo.data;
+        document.data = data;
+        if(Fg){
+          Fg.clearLayers();
+        }
+        Fg = L.featureGroup();
+        for(var i=0;i<data.length;i++){
+
+          /*var baseUrl = "/icon/marker-icon-";
+          var _icon = "";
+          if(data[i].plant_diseases=="0"){
+            _icon = baseUrl+"green.png";
+          }else if(data[i].plant_diseases=="1"){
+            _icon = baseUrl+"grey.png";
+          }else if(data[i].plant_diseases=="2"){
+            _icon = baseUrl+"yellow.png";
+          }else if(data[i].plant_diseases=="3"){
+            _icon = baseUrl+"violet.png";
+          }else if(data[i].plant_diseases=="4"){
+            _icon = baseUrl+"orange.png";
+          }else if(data[i].plant_diseases=="5"){
+            _icon = baseUrl+"black.png";
+          }else if(data[i].plant_diseases=="6"){
+            _icon = baseUrl+"blue.png";
+          }else if(data[i].plant_diseases=="99"){
+            _icon = baseUrl+"red.png";
+          }else if(data[i].plant_diseases=="OTH"){
+            _icon = baseUrl+"grey.png";
+          }
+          var icon,marker;
+          if(_icon!=""){
+            icon = new L.Icon({
+              iconUrl: _icon,
+              shadowUrl: Config.Url+"/icon/marker-shadow.png",
+              iconSize: [25, 41],
+              iconAnchor: [12, 41],
+              popupAnchor: [1, -34],
+              shadowSize: [41, 41]
+            });
+            marker = L.marker([parseFloat(data[i].lat), parseFloat(data[i].lng)],{icon: icon});
+          }else{*/
+            marker = L.circleMarker([parseFloat(data[i].lat), parseFloat(data[i].lng)],{radius: 7,color: "#00ff00"});
+          //}
+
+          var html = "<div>\
+          <div>ถ่ายเมื่อ : <span class='info'>"+data[i].create_date+"</span></div>\
+          <div>ผู้รายงาน : <span class='info'>"+data[i].collector+"</span></div>\
+          <div>หมายเหตุ : <span class='info'>"+data[i].remark+"</span></div>";
+          if(data[i].pictures && data[i].pictures.length>0){
+            html += "<div><a href='#' spotcheck_id='"+data[i].id+"' create_date='"+data[i].create_date+"' onclick=\"openPictures(this);\">ดูรูปถ่าย...</a></div>";
+          }
+          html += "<div>นำทาง : <span class='info'><a href='#' onclick=\"window.open('https://www.google.com/maps?saddr=My+Location&daddr="+data[i].lat+","+data[i].lng+"','nmap');\">Google Map</a></span></div>";
+          html += "</div>";
+          marker.bindPopup(html);
+          Fg.addLayer(marker);
+        }
+        Fg.addTo(map);
+        map.fitBounds(Fg.getBounds());
+      }catch(e){
+        app.dialog.alert(e,"Exception");
+      }
+    }
+  });
+}
+
+
+function openPictures(elm){
+  try{
+    var photos = [];
+    var spotcheck_id = $(elm).attr("spotcheck_id");
+    for(var i=0;i<document.data.length;i++){
+      if(document.data[i].id==spotcheck_id){
+        for(var j=0;j<document.data[i].pictures.length;j++){
+          photos.push({
+            url: "pictures/"+document.data[i].pictures[j].picture
+            ,caption: document.data[i].create_date
+          });
+        }
+        break;
+      }
+    }
+    
+    var photoAlbum = app.photoBrowser.create({
+        photos : photos,
+        theme: 'dark',
+        type: 'standalone'
+    });
+    photoAlbum.open();
+  }catch(e){
+    app.dialog.alert(e,"Exception");
+  }
+}
+
+function setMapOnForm(pos){
+  $("#form-map").css("width","100%");
+  $("#form-map").css("height","200px");
+  var bingLayer = L.tileLayer.bing(BING_KEY);
+
+  map = L.map('form-map').setView([pos.coords.latitude, pos.coords.longitude], 18);
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+		attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+	});
+  osm.addTo(map);
+  var bLayers = {
+    "แผนที่เส้นทาง": osm
+    ,"แผนที่จากดาวเทียม": bingLayer
+  }
+  var control = L.control.layers(bLayers,{},{position:"bottomleft"});
+  control.addTo(map);
+
+  var marker = L.marker([pos.coords.latitude, pos.coords.longitude]);
+  marker.addTo(map);
+}
+
+//
+//
+//
+MAP.zoomToData = function(){
+  var divition_c = $("#division_c").val();
+  var district_c = $("#district_c").val();
+
+  if(division_c && !district_c){
+    var x = parseFloat($("#division_c option:selected").attr("x"));
+    var y = parseFloat($("#division_c option:selected").attr("y"));
+
+    map.setZoom(16);
+    map.panTo([y,x]);
+    $("#tab-map").trigger("click");
+
+  }else if(division_c && district_c){
+    var x = parseFloat($("#district_c option:selected").attr("x"));
+    var y = parseFloat($("#district_c option:selected").attr("y"));
+
+    map.setZoom(16);
+    map.panTo([y,x]);
+    $("#tab-map").trigger("click");
+
+  }
+}

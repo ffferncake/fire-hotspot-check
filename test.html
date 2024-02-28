@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+    integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+    crossorigin=""></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="http://lab.digital-democracy.org/leaflet-bing-layer/leaflet-bing-layer.js"></script>
+    <script src="jquery-3.5.1.min.js"></script>
+    <script type="text/javascript">
+
+ 
+  var mymap;
+  window.onload = function(){
+  mymap = L.map('mapid').setView([13, 101], 6);
+
+ 
+  var osm = L.tileLayer('http://a.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  });
+  osm.addTo(mymap);
+  var ggs = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+  });
+  var esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  });
+  var Bing_KEY = 'AuhiCJHlGzhg93IqUH_oCpl_-ZUrIE6SPftlyGYUvr9Amx5nzA-WqGcPquyFZl4L'
+  var bingLayer = L.tileLayer.bing(Bing_KEY)
+  
+  var hotspot = L.tileLayer.wms("http://localhost:8080/geoserver/hotspot/wms", {
+   layers: 'hotspot:hotspot_ass6',
+   format: 'image/png',
+   transparent: true,
+  });
+  hotspot.addTo(mymap);
+  
+  var province = L.tileLayer.wms("http://localhost:8080/geoserver/province/wms", {
+   layers: 'province:Province',
+   format: 'image/png',
+   transparent: true,
+  });
+  province.addTo(mymap);
+  
+
+  var baseLayers = {
+   "OpenStreetMap": osm,"Googlesatellite":ggs,"Esrisatellite":esri,"bingsat":bingLayer
+  };
+
+  var overlays = {
+   "hotspot": hotspot,"province":province
+  };
+
+  L.control.layers(baseLayers, overlays).addTo(mymap);
+  
+  }
+
+  function doMapClick(e){
+    var txt = $("#kubuilding_name").val();
+    console.log(e);
+  $.ajax({
+    url:"server/connection_1.jsp"
+    ,type:"POST" 
+    ,data:{
+      index:"identify"
+    ,utm_res: utm_res
+    ,geo_res: geo_res
+    ,x: ll.lng
+    ,y: ll.lat
+  }
+    ,complete:function(xhr){
+    try{
+      Sys.HideLoading();
+      var jo = $.parseJSON(xhr.responseText);
+      if(jo && jo.exception){
+        app.dialog.alert(jo.exception);
+        return false;
+    }  
+      var html ="";
+      if(jo.data && jo.name=="province_th"){
+        html = "ข้อมูล <span style='color:red;'>จังหวัด</span>"+
+        "<br/>"+jo.data.prov_code+
+        "<br/>"+jo.data.prov_name+
+
+      }else if(jo.data && jo.name=="hotspot_ass6"){
+        html = "ข้อมูล <span style='color:red;'>จุดความร้อน</span>"+
+        "<br/>"+jo.data.latitude+
+        "<br/>"+jo.data.longitude+
+        "<br/> วันที่เก็บข้อมูล <span style='color:blue;'>"+jo.data.acq_time+"</span> "+
+        "<br/> Fire Radiative Power <span style='color:blue;'>"+jo.data.frp+"</span> "+
+        "<br/> bright_ti4 <span style='color:blue;'>"+jo.data.bright_ti4+"</span> "
+      }
+      if(html=="") return false;
+      L.popup()
+      .setLatLng(ll)
+      .setContent(html)
+      .openOn(map);
+
+      }catch(e){
+        alert(e);
+    }
+   }
+
+   </script>
+   </head>
+   <body>
+   <style>
+    @import 'https://fonts.googleapis.com/css?family=Montserrat|Open+Sans';
+    .navbar-brand {
+    font-family: 'Montserrat', sans-serif;
+    text-transform: uppercase
+    }
+
+    .navbar .nav {
+    font-family: 'Open Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 1.2rem
+    }
+
+    .navbar-inverse {
+    background-color: #003300
+    }
+
+    .navbar-inverse .navbar-nav>.active>a:hover,
+    .navbar-inverse .navbar-nav>li>a:hover,
+    .navbar-inverse .navbar-nav>li>a:focus {
+    background-color: #002200
+    }
+
+    .navbar-inverse .navbar-nav>.active>a,
+    .navbar-inverse .navbar-nav>.open>a,
+    .navbar-inverse .navbar-nav>.open>a,
+    .navbar-inverse .navbar-nav>.open>a:hover,
+    .navbar-inverse .navbar-nav>.open>a,
+    .navbar-inverse .navbar-nav>.open>a:hover,
+    .navbar-inverse .navbar-nav>.open>a:focus {
+    background-color: #003300
+    }
+
+    .dropdown-menu {
+    background-color: #006B00
+    }
+
+    .dropdown-menu>li>a:hover,
+    .dropdown-menu>li>a:focus {
+    background-color: #002200
+    }
+
+    .navbar-inverse {
+    background-image: none;
+    }
+
+    .dropdown-menu>li>a:hover,
+    .dropdown-menu>li>a:focus {
+    background-image: none;
+    }
+
+    .navbar-inverse {
+    border-color: #003300
+    }
+
+    .navbar-inverse .navbar-brand {
+    color: #FFFFFF
+    }
+
+    .navbar-inverse .navbar-brand:hover {
+    color: #FFCC00
+    }
+
+    .navbar-inverse .navbar-nav>li>a {
+    color: #FFFFFF
+    }
+
+    .navbar-inverse .navbar-nav>li>a:hover,
+    .navbar-inverse .navbar-nav>li>a:focus {
+    color: #FFCC00
+    }
+
+    .navbar-inverse .navbar-nav>.active>a,
+    .navbar-inverse .navbar-nav>.open>a,
+    .navbar-inverse .navbar-nav>.open>a:hover,
+    .navbar-inverse .navbar-nav>.open>a:focus {
+    color: #FFCC00
+    }
+
+    .navbar-inverse .navbar-nav>.active>a:hover,
+    .navbar-inverse .navbar-nav>.active>a:focus {
+    color: #FFCC00
+    }
+
+    .dropdown-menu>li>a {
+    color: #FFFFFF
+    }
+
+    .dropdown-menu>li>a:hover,
+    .dropdown-menu>li>a:focus {
+    color: #FFCC00
+    }
+
+    .navbar-inverse .navbar-nav>.dropdown>a .caret {
+    border-top-color: #FFFFFF
+    }
+
+    .navbar-inverse .navbar-nav>.dropdown>a:hover .caret {
+    border-top-color: #FFFFFF
+    }
+
+    .navbar-inverse .navbar-nav>.dropdown>a .caret {
+    border-bottom-color: #FFFFFF
+    }
+
+    .navbar-inverse .navbar-nav>.dropdown>a:hover .caret {
+    border-bottom-color: #FFFFFF
+    }
+    </style>
+    <header class="navbar navbar-inverse navbar-fixed-top bs-docs-nav" role="banner">
+    <div class="container">
+    <div class="navbar-header">
+      <button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".bs-navbar-collapse">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a href="./" class="navbar-brand">Interactive Web Map</a>
+    </div>
+    <nav class="collapse navbar-collapse bs-navbar-collapse" role="navigation">
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+          <a href="#">Home</a>
+        </li>
+        <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown">About <b class="caret"></b></a>
+          <ul class="dropdown-menu">
+            <li><a href="#">Mission</a></li>
+            <li><a href="#">Vision</a></li>
+            <li><a href="#">Careers</a></li>
+          </ul>
+        </li>
+        <li>
+          <a href="#">Products</a>
+        </li>
+        <li>
+          <a href="#">Services</a>
+        </li>
+        <li class="active">
+          <a href="#">Contact</a>
+        </li>
+      </ul>
+     </nav>
+    </div>
+    <div id="div-map" class="content">
+        <div id="mapid" style="width:100%;"></div>
+    </div>
+    </header>
+</body>
+</html>

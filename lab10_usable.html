@@ -1,0 +1,186 @@
+<!doctype html>
+<html>
+ 	<meta charset="UTF-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+	
+	
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol/dist/L.Control.Locate.min.css" />
+
+	<script src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol/dist/L.Control.Locate.min.js" charset="utf-8"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+		integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+		crossorigin=""/>
+	<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+		integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+		crossorigin=""></script>
+		<script src="http://lab.digital-democracy.org/leaflet-bing-layer/leaflet-bing-layer.js"></script>
+		<script src="jquery-3.5.1.min.js"></script>
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+
+	
+	<script type="text/javascript">
+	
+	
+	function getTMDStations(){
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4 && this.status == 200) {
+				//console.log(this.responseText);
+				var geojson = $.parseJSON(this.responseText);
+				L.geoJson(geojson).addTo(mymap);
+		}
+	};
+    xhttp.open("GET", "http://localhost:8080/geoserver/wfs?service=WFS&version=1.1.0&request=getfeature&typename=tmdstations&outputformat=json", true);
+    xhttp.send();
+  }
+ 
+  var mymap;  
+	
+  window.onload = function(){
+
+  mymap = L.map('mapid').setView([13, 101], 13);
+  
+  var osm = L.tileLayer('http://a.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  });
+  osm.addTo(mymap);
+  var ggs = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+  });
+  var esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  });
+  var Bing_KEY = 'AuhiCJHlGzhg93IqUH_oCpl_-ZUrIE6SPftlyGYUvr9Amx5nzA-WqGcPquyFZl4L'
+  var bingLayer = L.tileLayer.bing(Bing_KEY)
+  
+  var province = L.tileLayer.wms("/geoserver/province2/wms", {
+   layers: 'province4326',
+   format: 'image/png',
+   transparent: true,
+  });
+  province.addTo(mymap);
+  
+  var baseLayers = {
+   "OpenStreetMap": osm,"Googlesatellite":ggs,"Esrisatellite":esri,"bingsat":bingLayer
+  };
+
+  var overlays = {
+   "Province": province
+  };
+
+  L.control.layers(baseLayers, overlays).addTo(mymap);
+  
+  mymap.on("click",doMapClick);
+  
+  window.onresize = resizeMap;
+  resizeMap();
+  $("#mnu-search").on("click",page.search);
+  $("#mnu-map").on("click",page.map);
+  
+  }
+   
+  function doMapClick(e){
+	  var txt = $("#province_name").val();
+	  console.log(e);
+	  $.ajax({
+		url:"/geoserver/wfs",
+		data:{
+			request:"getfeature",
+			typename:"province2:province4326",
+			cql_filter:"PROV_NAME LIKE '%"+txt+"%'",
+			outputformat:"json"
+		}
+		,complete:function(xhr){
+			var jo=$.parseJSON(xhr.responseText);
+			var popup = L.popup();
+			popup.setLatLng(e.latlng);
+			popup.setContent(jo.features[0].properties["PROV_NAME"]);
+			popup.openOn(mymap);
+		}
+	});
+}
+	
+	function search(){
+		var txt = $("#province_name").val();
+	 
+		$.ajax({
+		  url:"/geoserver/wfs",
+		  data:{
+			request:"getfeature",
+			typename:"province2:province4326",
+			type:"POST",
+			cql_filter:"PROV_NAME LIKE '"+txt+"'",
+			outputformat:"json"
+		  } 
+		
+		  ,complete:function(xhr){
+			var jo=$.parseJSON(xhr.responseText);
+			var feat = L.geoJSON(jo);
+			//console.log(feat);
+			if(jo.features.length==0){
+				alert("ไม่พบข้อมูล");
+				//return false ;
+		    }else{
+		
+		       mymap.fitBounds(feat.getBounds());
+		       page.map();
+			}			
+		  }
+		
+		});
+}	
+	
+    function resizeMap(){
+    var hdHeight = $("#header").outerHeight();
+    var ftHeight = $("#footer").outerHeight();
+    var bdHeight = $(document).height();
+    $("#mapid").height(bdHeight - hdHeight - ftHeight);
+    mymap.invalidateSize();
+   
+   }
+   
+	var page = {
+		map: function(){
+			$("#div-map").show();
+			$("#div-search").hide();
+			mymap.invalidateSize();
+		}
+		,search: function(){
+			$("#div-map").hide();
+			$("#div-search").show();
+		}	
+	}
+
+   </script>
+   </head>
+   <body>
+		<!--div id="mapid" style="width:100%;height:600px;"></div>
+		<div style="padding:1em;">
+			<button onclick="getTMDStations();">แสดงสถานีตรวจอากาศ</button>
+		</div-->
+		
+		<div class="container-sm">
+			<nav id = "header" class="navbar navbar-dark bg-dark"style="color:white;">
+				<a class="navbar-brand" href="#" id="mnu-map">KU Web Map</a>
+				<a class="nav-link" id="mnu-search">Search</a>
+			</nav>
+			</div>
+			<div id="div-map" class="content">
+				<div id="mapid" style="width:100%;"></div>
+			</div>
+			<div id="div-search" class="content" style="display:none;padding:3em;">
+			 <form onsubmit="return false;">
+				<div class="form-group">
+				 <label>Province Name</label>
+				 <input type="text" class="form-control" id="province_name"/>
+				</div>
+				<button class="btn btn-primary" onclick="search();">สืบค้น</button>
+			 </form>
+			</div>
+		
+			<nav id="footer" class="navbar navbar-dark bg-dark" style="color:white;text-align:center;">
+				<a class="navbar-brand" href="#">Geographic information Online Class.2563</a>
+			</nav>
+		
+   </body>
+</html>
